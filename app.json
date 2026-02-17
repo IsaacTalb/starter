@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "starter",
-    "slug": "starter",
+    "slug": "ideahub",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -25,24 +25,17 @@
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-    "plugins": [
-      "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
-        }
-      ]
-    ],
+    "plugins": ["expo-router", ["expo-splash-screen", {"image":"./assets/images/splash-icon.png","imageWidth":200,"resizeMode":"contain","backgroundColor":"#ffffff","dark":{"backgroundColor":"#000000"}}]],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "992d0dbd-b5f6-4637-a37c-8a73d3ec339b"
+      }
+    },
+    "owner": "isaactalb"
   }
 }
