@@ -27,7 +27,7 @@ export default function ChatView({ messages, onSend, loading = false, error = nu
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.wrap}>
-      <ScrollView ref={scrollRef} contentContainerStyle={styles.messages}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.messages} keyboardShouldPersistTaps="handled">
         {messages.map((m) => {
           const isUser = m.role === 'user';
           return (
@@ -54,26 +54,32 @@ export default function ChatView({ messages, onSend, loading = false, error = nu
       ) : null}
 
       <View style={styles.inputRow}>
-        <TextInput
-          value={text}
-          onChangeText={setText}
-          placeholder="Ask for details, risks, or next steps..."
-          style={styles.input}
-          editable={!loading}
-          placeholderTextColor={theme.colors.textMuted}
-          multiline
-        />
-        <Button
-          title="Send"
-          loading={loading}
-          disabled={loading || !text.trim()}
-          onPress={async () => {
-            if (!text.trim()) return;
-            const payload = text.trim();
-            setText('');
-            await onSend(payload);
-          }}
-        />
+        <View style={styles.composerWrap}>
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            placeholder="Ask for details, risks or next steps..."
+            style={styles.input}
+            editable={!loading}
+            placeholderTextColor={theme.colors.textMuted}
+            multiline
+            textAlignVertical="top"
+          />
+          <View style={styles.sendInInput}>
+            <Button
+              title="Send"
+              loading={loading}
+              disabled={loading || !text.trim()}
+              onPress={async () => {
+                if (!text.trim()) return;
+                const payload = text.trim();
+                setText('');
+                await onSend(payload);
+              }}
+              style={styles.sendBtn}
+            />
+          </View>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -142,24 +148,35 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.caption,
   },
   inputRow: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
     padding: theme.spacing.md,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
-    alignItems: 'flex-end',
   },
-  input: {
-    flex: 1,
+  composerWrap: {
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: theme.radius.md,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    color: theme.colors.text,
+    borderRadius: 16,
     backgroundColor: theme.colors.surface,
-    minHeight: 44,
-    maxHeight: 100,
+    position: 'relative',
+  },
+  input: {
+    color: theme.colors.text,
+    paddingTop: 10,
+    paddingBottom: 10,
+    paddingLeft: 12,
+    paddingRight: 88,
+    minHeight: 46,
+    maxHeight: 120,
+  },
+  sendInInput: {
+    position: 'absolute',
+    right: 6,
+    bottom: 6,
+  },
+  sendBtn: {
+    minWidth: 68,
+    paddingVertical: 8,
+    borderRadius: 12,
   },
 });
