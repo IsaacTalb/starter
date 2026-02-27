@@ -1,26 +1,34 @@
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Badge from '../components/Badge';
 import Button from '../components/Button';
-import { getAISettings, getProviderApiKey, getProviderLabel } from '../lib/ai';
+import { getAISettings, getProviderApiKey, getProviderLabel, hasAnyProviderKey } from '../lib/ai';
 import { createNote, deleteNote, getNotes, Note } from '../lib/storage';
 import { theme } from '../theme';
 
 export default function IdeaList() {
   const [notes, setNotes] = useState<Note[]>([]);
-  const [providerHint, setProviderHint] = useState<string>('');
+  const [providerHint, setProviderHint] = useState<string>('NVIDIA');
   const [hasKey, setHasKey] = useState<boolean | null>(null);
   const router = useRouter();
 
   async function load() {
     const data = await getNotes();
     setNotes(data);
+
     const settings = await getAISettings();
     setProviderHint(getProviderLabel(settings.provider));
-    const key = await getProviderApiKey(settings.provider);
-    setHasKey(Boolean(key));
+
+    const selectedKey = await getProviderApiKey(settings.provider);
+    if (selectedKey?.trim()) {
+      setHasKey(true);
+      return;
+    }
+
+    const anyKey = await hasAnyProviderKey();
+    setHasKey(anyKey);
   }
 
   useEffect(() => {
@@ -43,6 +51,8 @@ export default function IdeaList() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <Stack.Screen options={{ title: 'IdeaHub Notes' }} />
+
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.title}>IdeaHub</Text>
@@ -55,11 +65,11 @@ export default function IdeaList() {
       </View>
 
       <View style={styles.infoCard}>
-        <Badge label={`AI: ${providerHint || 'NVIDIA'}`} />
+        <Badge label={`AI: ${providerHint}`} />
         <Text style={styles.infoText}>
           {hasKey === false
-            ? `No ${providerHint || 'selected provider'} API key configured. Add one in Settings to unlock AI responses.`
-            : 'AI is configured. Open a note to generate insights and chat with context.'}
+            ? `No API key found yet. Add a key in Settings for ${providerHint} (or any provider).`
+            : `AI is ready. Current provider: ${providerHint}. Open a note to generate insights and chat.`}
         </Text>
       </View>
 

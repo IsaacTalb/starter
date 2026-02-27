@@ -1,5 +1,5 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../components/Button';
@@ -19,6 +19,7 @@ export default function IdeaEditor() {
   const [loading, setLoading] = useState(true);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [showEditor, setShowEditor] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -30,6 +31,11 @@ export default function IdeaEditor() {
       setLoading(false);
     })();
   }, [id]);
+
+  const headerTitle = useMemo(() => {
+    if (!note?.title?.trim()) return 'Idea Detail';
+    return note.title.length > 22 ? `${note.title.slice(0, 22)}...` : note.title;
+  }, [note]);
 
   async function handleSave(updated: Note) {
     await updateNote(updated);
@@ -45,9 +51,7 @@ export default function IdeaEditor() {
     const prompt = `Create concise insights for this note.\nTitle: ${note.title || 'Untitled'}\n\nNote:\n${seed}`;
     const result = await getInsights({ text: prompt });
 
-    if (result.error) {
-      setAiError(result.error);
-    }
+    if (result.error) setAiError(result.error);
 
     if (result.summary) {
       const assistantMsg = await appendMessage(String(id), { role: 'assistant', content: result.summary });
@@ -114,11 +118,22 @@ export default function IdeaEditor() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-      <NoteEditor note={note} onSave={handleSave} />
+      <Stack.Screen options={{ title: headerTitle }} />
+
       <View style={styles.chatHeader}>
         <Text style={styles.chatTitle}>Insight Chat</Text>
-        <Button title="Generate insights" onPress={handleInsights} loading={aiLoading} disabled={aiLoading} />
+        <View style={styles.headerButtons}>
+          <Button title={showEditor ? 'Hide Note' : 'Edit Note'} variant="secondary" onPress={() => setShowEditor((s) => !s)} />
+          <Button title="Generate" onPress={handleInsights} loading={aiLoading} disabled={aiLoading} />
+        </View>
       </View>
+
+      {showEditor ? (
+        <View style={styles.editorWrap}>
+          <NoteEditor note={note} onSave={handleSave} />
+        </View>
+      ) : null}
+
       <View style={styles.chatWrap}>
         <ChatView messages={messages ?? []} onSend={handleSendFollowup} loading={aiLoading} error={aiError} />
       </View>
@@ -167,7 +182,18 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: theme.typography.h2,
   },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: theme.spacing.xs,
+  },
+  editorWrap: {
+    maxHeight: 300,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: theme.colors.border,
+  },
   chatWrap: {
     flex: 1,
+    minHeight: 300,
   },
 });

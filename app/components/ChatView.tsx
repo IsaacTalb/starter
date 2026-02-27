@@ -42,7 +42,7 @@ export default function ChatView({ messages, onSend, loading = false, error = nu
 
         {loading && (
           <View style={styles.pendingBubble}>
-            <Text style={styles.pendingText}>Thinking…</Text>
+            <Text style={styles.pendingText}>Thinking...</Text>
           </View>
         )}
       </ScrollView>
@@ -61,6 +61,7 @@ export default function ChatView({ messages, onSend, loading = false, error = nu
           style={styles.input}
           editable={!loading}
           placeholderTextColor={theme.colors.textMuted}
+          multiline
         />
         <Button
           title="Send"
@@ -87,13 +88,14 @@ const styles = StyleSheet.create({
   messages: {
     padding: theme.spacing.md,
     gap: theme.spacing.sm,
+    paddingBottom: theme.spacing.lg,
   },
   msgBlock: {
-    maxWidth: '86%',
+    maxWidth: '94%',
     gap: 3,
   },
   bubble: {
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.lg,
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
   },
@@ -146,7 +148,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
-    alignItems: 'center',
+    alignItems: 'flex-end',
   },
   input: {
     flex: 1,
@@ -157,5 +159,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
     color: theme.colors.text,
     backgroundColor: theme.colors.surface,
+    minHeight: 44,
+    maxHeight: 100,
   },
 });

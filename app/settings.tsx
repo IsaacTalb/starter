@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Button from './components/Button';
@@ -100,7 +100,9 @@ export default function Settings() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <>
+      <Stack.Screen options={{ title: 'AI Settings' }} />
+      <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>AI Settings</Text>
       <Text style={styles.subtitle}>Choose provider + model, manage provider-specific API keys, and validate connectivity.</Text>
 
@@ -169,8 +171,9 @@ export default function Settings() {
         </View>
       )}
 
-      <Button title="Back" variant="ghost" onPress={() => router.back()} />
-    </ScrollView>
+        <Button title="Back" variant="ghost" onPress={() => router.back()} />
+      </ScrollView>
+    </>
   );
 }
 

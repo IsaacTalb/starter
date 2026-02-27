@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   NativeSyntheticEvent,
   ScrollView,
@@ -17,27 +17,41 @@ type Props = {
   onSave: (note: Note) => Promise<void> | void;
 };
 
-type Formatter = {
+type Selection = { start: number; end: number };
+
+type Tool = {
   label: string;
-  snippet: string;
+  onPress: (content: string, selection: Selection) => { text: string; cursor: number };
 };
 
-const formatters: Formatter[] = [
-  { label: 'H1', snippet: '\n# ' },
-  { label: 'Bullet', snippet: '\n- ' },
-  { label: 'Checklist', snippet: '\n- [ ] ' },
-  { label: 'Bold', snippet: '**bold**' },
-  { label: 'Code', snippet: '\n```\n\n```\n' },
-  { label: 'Divider', snippet: '\n---\n' },
+function replaceRange(content: string, selection: Selection, inserted: string) {
+  const before = content.slice(0, selection.start);
+  const after = content.slice(selection.end);
+  const text = `${before}${inserted}${after}`;
+  return { text, cursor: before.length + inserted.length };
+}
+
+function wrapRange(content: string, selection: Selection, prefix: string, suffix: string = prefix) {
+  const selected = content.slice(selection.start, selection.end) || 'text';
+  const next = `${prefix}${selected}${suffix}`;
+  return replaceRange(content, selection, next);
+}
+
+const tools: Tool[] = [
+  { label: 'B', onPress: (c, s) => wrapRange(c, s, '**') },
+  { label: 'I', onPress: (c, s) => wrapRange(c, s, '_') },
+  { label: 'H1', onPress: (c, s) => replaceRange(c, s, '\n# ') },
+  { label: '•', onPress: (c, s) => replaceRange(c, s, '\n- ') },
+  { label: '1.', onPress: (c, s) => replaceRange(c, s, '\n1. ') },
+  { label: '☑', onPress: (c, s) => replaceRange(c, s, '\n- [ ] ') },
+  { label: '</>', onPress: (c, s) => replaceRange(c, s, '\n```\n\n```\n') },
 ];
 
 export default function NoteEditor({ note: initial, onSave }: Props) {
   const [title, setTitle] = useState(initial.title ?? '');
   const [content, setContent] = useState(initial.content ?? '');
   const [saving, setSaving] = useState(false);
-  const [selection, setSelection] = useState({ start: 0, end: 0 });
-
-  const helperText = useMemo(() => 'Use quick actions to insert markdown-like structure.', []);
+  const [selection, setSelection] = useState<Selection>({ start: 0, end: 0 });
 
   async function handleSave() {
     setSaving(true);
@@ -45,13 +59,10 @@ export default function NoteEditor({ note: initial, onSave }: Props) {
     setSaving(false);
   }
 
-  function insertSnippet(snippet: string) {
-    const before = content.slice(0, selection.start);
-    const after = content.slice(selection.end);
-    const next = `${before}${snippet}${after}`;
-    const nextCursor = before.length + snippet.length;
-    setContent(next);
-    setSelection({ start: nextCursor, end: nextCursor });
+  function applyTool(tool: Tool) {
+    const result = tool.onPress(content, selection);
+    setContent(result.text);
+    setSelection({ start: result.cursor, end: result.cursor });
   }
 
   function handleSelectionChange(event: NativeSyntheticEvent<TextInputSelectionChangeEventData>) {
@@ -72,23 +83,20 @@ export default function NoteEditor({ note: initial, onSave }: Props) {
       </View>
 
       <View style={styles.fieldWrap}>
-        <View style={styles.editorHeader}>
-          <Text style={styles.label}>Content</Text>
-          <Text style={styles.helper}>{helperText}</Text>
+        <View style={styles.toolbarShell}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolbar}>
+            {tools.map((tool) => (
+              <Button
+                key={tool.label}
+                title={tool.label}
+                variant="secondary"
+                onPress={() => applyTool(tool)}
+                style={styles.toolBtn}
+                textStyle={styles.toolBtnText}
+              />
+            ))}
+          </ScrollView>
         </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolbar}>
-          {formatters.map((item) => (
-            <Button
-              key={item.label}
-              title={item.label}
-              variant="secondary"
-              onPress={() => insertSnippet(item.snippet)}
-              style={styles.toolBtn}
-              textStyle={styles.toolBtnText}
-            />
-          ))}
-        </ScrollView>
 
         <TextInput
           value={content}
@@ -110,8 +118,8 @@ export default function NoteEditor({ note: initial, onSave }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    padding: theme.spacing.lg,
-    gap: theme.spacing.md,
+    padding: theme.spacing.md,
+    gap: theme.spacing.sm,
     backgroundColor: theme.colors.bg,
   },
   fieldWrap: {
@@ -121,13 +129,6 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontWeight: '700',
     fontSize: theme.typography.body,
-  },
-  helper: {
-    color: theme.colors.textMuted,
-    fontSize: theme.typography.caption,
-  },
-  editorHeader: {
-    gap: 2,
   },
   input: {
     borderWidth: 1,
@@ -139,21 +140,29 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.sm,
     fontSize: theme.typography.body,
   },
+  toolbarShell: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.pill,
+    backgroundColor: '#EEF3FF',
+  },
   toolbar: {
-    gap: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
+    gap: theme.spacing.xs,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
   },
   toolBtn: {
-    minHeight: 34,
-    paddingVertical: 6,
-    paddingHorizontal: theme.spacing.sm,
+    minHeight: 30,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: theme.radius.pill,
   },
   toolBtnText: {
     fontSize: theme.typography.caption,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   editorInput: {
-    minHeight: 180,
+    minHeight: 130,
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.md,

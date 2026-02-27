@@ -19,6 +19,8 @@ export type InsightsResult = {
 const SETTINGS_KEY = 'ideahub_ai_settings_v1';
 const KEY_PREFIX = 'IDEAHUB_API_KEY_';
 
+export const providers: AIProvider[] = ['nvidia', 'openai', 'gemini'];
+
 export const defaultModels: Record<AIProvider, string> = {
   nvidia: 'meta/llama-3.1-70b-instruct',
   openai: 'gpt-4o-mini',
@@ -72,6 +74,11 @@ export async function getProviderApiKey(provider: AIProvider): Promise<string | 
   } catch {
     return null;
   }
+}
+
+export async function hasAnyProviderKey(): Promise<boolean> {
+  const keys = await Promise.all(providers.map((p) => getProviderApiKey(p)));
+  return keys.some((k) => Boolean(k && k.trim()));
 }
 
 export async function setProviderApiKey(provider: AIProvider, key: string) {
