@@ -12,12 +12,12 @@ export type Note = {
   createdAt: number;
   updatedAt: number;
   // Conversation messages (chat history of insights)
-  messages?: Array<{
+  messages?: {
     id: string;
     role: 'user' | 'assistant' | 'system';
     content: string;
     createdAt: number;
-  }>;
+  }[];
 };
 
 const NOTES_KEY = 'ideas_notes_v1';
@@ -26,7 +26,7 @@ export async function getNotes(): Promise<Note[]> {
   try {
     const json = await AsyncStorage.getItem(NOTES_KEY);
     return json ? JSON.parse(json) : [];
-  } catch (e) {
+  } catch {
     return [];
   }
 }

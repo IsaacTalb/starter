@@ -1,19 +1,25 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../components/Button';
 import ChatView from '../components/ChatView';
 import NoteEditor from '../components/NoteEditor';
-import { getApiKey, getInsights } from '../lib/nvidia';
-import { appendMessage, getConversation, getNote, updateNote } from '../lib/storage';
+import { getInsights } from '../lib/ai';
+import { appendMessage, getConversation, getNote, Note, updateNote } from '../lib/storage';
+import { theme } from '../theme';
+
+const CONTEXT_LIMIT = 8;
 
 export default function IdeaEditor() {
   const { id } = useLocalSearchParams();
-  const [note, setNote] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [insights, setInsights] = useState<any | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
   const router = useRouter();
+  const [note, setNote] = useState<Note | null>(null);
+  const [messages, setMessages] = useState<Note['messages']>([]);
+  const [loading, setLoading] = useState(true);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [showEditor, setShowEditor] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -26,60 +32,168 @@ export default function IdeaEditor() {
     })();
   }, [id]);
 
-  async function handleSave(updated: any) {
+  const headerTitle = useMemo(() => {
+    if (!note?.title?.trim()) return 'Idea Detail';
+    return note.title.length > 22 ? `${note.title.slice(0, 22)}...` : note.title;
+  }, [note]);
+
+  async function handleSave(updated: Note) {
     await updateNote(updated);
     setNote(updated);
   }
 
   async function handleInsights() {
-    if (!note) return;
-    const key = await getApiKey();
-    const result = await getInsights(note.content || note.title || '', key ?? undefined);
-    setInsights(result);
+    if (!note || !id) return;
+    setAiLoading(true);
+    setAiError(null);
+
+    const seed = note.content?.trim() || note.title?.trim() || 'Summarize this note.';
+    const prompt = `Create concise insights for this note.\nTitle: ${note.title || 'Untitled'}\n\nNote:\n${seed}`;
+    const result = await getInsights({ text: prompt });
+
+    if (result.error) setAiError(result.error);
+
     if (result.summary) {
-      const m = await appendMessage(String(id), { role: 'assistant', content: result.summary });
-      setMessages((s) => [...s, m]);
+      const assistantMsg = await appendMessage(String(id), { role: 'assistant', content: result.summary });
+      setMessages((prev) => [...(prev ?? []), assistantMsg]);
     }
+
+    setAiLoading(false);
   }
 
   async function handleSendFollowup(text: string) {
-    if (!note) return;
-    // store user message
-    const userMsg = await appendMessage(String(id), { role: 'user', content: text });
-    setMessages((s) => [...s, userMsg]);
+    if (!note || !id) return;
+    setAiLoading(true);
+    setAiError(null);
 
-    // send to API including context (we'll concatenate recent messages)
+    const userMsg = await appendMessage(String(id), { role: 'user', content: text });
+    setMessages((prev) => [...(prev ?? []), userMsg]);
+
     const convo = await getConversation(String(id));
-    const last = convo.map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n');
-    const prompt = `${last}\nUser: ${text}\nAssistant:`;
-    const key = await getApiKey();
-    const res = await getInsights(prompt, key ?? undefined);
-    if (res.summary) {
-      const assistantMsg = await appendMessage(String(id), { role: 'assistant', content: res.summary });
-      setMessages((s) => [...s, assistantMsg]);
+    const recent = convo.slice(-CONTEXT_LIMIT);
+    const context = recent.map((msg) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join('\n');
+
+    const prompt = [
+      'You are helping improve a product idea note. Be concrete and concise.',
+      `Note title: ${note.title || 'Untitled'}`,
+      `Note content:\n${note.content || 'No content yet.'}`,
+      `Recent conversation:\n${context}`,
+      `User follow-up: ${text}`,
+    ].join('\n\n');
+
+    const result = await getInsights({ text: prompt });
+
+    if (result.error) {
+      setAiError(result.error);
+      setAiLoading(false);
+      return;
     }
+
+    if (result.summary) {
+      const assistantMsg = await appendMessage(String(id), { role: 'assistant', content: result.summary });
+      setMessages((prev) => [...(prev ?? []), assistantMsg]);
+    }
+
+    setAiLoading(false);
   }
 
-  if (loading) return <ActivityIndicator style={{ flex: 1 }} />;
-  if (!note)
+  if (loading) {
     return (
-      <View style={{ flex: 1, padding: 16 }}>
-        <Text>Note not found.</Text>
-        <Pressable onPress={() => router.push('/idea')} style={{ marginTop: 12 }}>
-          <Text style={{ color: '#0a84ff' }}>Back</Text>
+      <View style={styles.loadingWrap}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
+  if (!note) {
+    return (
+      <View style={styles.notFound}>
+        <Text style={styles.notFoundText}>Note not found.</Text>
+        <Pressable onPress={() => router.push('/idea')} style={styles.backLink}>
+          <Text style={styles.backText}>Back to ideas</Text>
         </Pressable>
       </View>
     );
+  }
 
   return (
-    <View style={{ flex: 1 }}>
-      <NoteEditor note={note} onSave={handleSave} />
-      <View style={{ flex: 1 }}>
-        <ChatView messages={messages} onSend={handleSendFollowup} />
+    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+      <Stack.Screen options={{ title: headerTitle }} />
+
+      <View style={styles.chatHeader}>
+        <Text style={styles.chatTitle}>Insight Chat</Text>
+        <View style={styles.headerButtons}>
+          <Button title={showEditor ? 'Hide Note' : 'Edit Note'} variant="secondary" onPress={() => setShowEditor((s) => !s)} />
+          <Button title="Generate" onPress={handleInsights} loading={aiLoading} disabled={aiLoading} />
+        </View>
       </View>
-      <View style={{ padding: 12 }}>
-        <Button title="Generate Insights" onPress={handleInsights} />
+
+      {showEditor ? (
+        <View style={styles.editorWrap}>
+          <NoteEditor note={note} onSave={handleSave} />
+        </View>
+      ) : null}
+
+      <View style={styles.chatWrap}>
+        <ChatView messages={messages ?? []} onSend={handleSendFollowup} loading={aiLoading} error={aiError} />
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: theme.colors.bg,
+  },
+  loadingWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.bg,
+  },
+  notFound: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  notFoundText: {
+    color: theme.colors.text,
+    fontSize: theme.typography.body,
+  },
+  backLink: {
+    padding: theme.spacing.sm,
+  },
+  backText: {
+    color: theme.colors.primary,
+    fontWeight: '700',
+  },
+  chatHeader: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing.sm,
+  },
+  chatTitle: {
+    color: theme.colors.text,
+    fontWeight: '800',
+    fontSize: theme.typography.h2,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: theme.spacing.xs,
+  },
+  editorWrap: {
+    maxHeight: 300,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  chatWrap: {
+    flex: 1,
+    minHeight: 300,
+  },
+});
